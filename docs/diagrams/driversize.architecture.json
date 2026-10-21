@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "DriverSize — Arquitetura de execução",
+    "subtitle": "Renderer Angular · ponte de contexto · processo principal Node · pool de workers · add-on nativo",
+    "output": "driversize.architecture.html",
+    "quality_profile": "standard",
+    "views": [
+      { "id": "scan-path", "label": "Caminho do scan", "focus": ["user", "ui", "preload", "main", "pool", "fs"], "note": "Do clique em Analisar ate a leitura do disco, atravessando o IPC." },
+      { "id": "shell-bridge", "label": "Ponte com o shell", "focus": ["main", "addon", "shell"], "note": "O add-on N-API abre o menu de contexto real do Windows." },
+      { "id": "state", "label": "Estado persistido", "focus": ["main", "settings", "export"], "note": "Preferencias em JSON e relatorios CSV/XML." }
+    ]
+  },
+  "components": [
+    { "id": "user", "type": "external", "label": "Usuario", "sublabel": "clique · atalhos", "pos": [30, 300], "size": [100, 64] },
+    { "id": "ui", "type": "frontend", "label": "Renderer Angular", "sublabel": "arvore · tabela", "pos": [170, 300], "size": [150, 64] },
+    { "id": "preload", "type": "security", "label": "Ponte (contextBridge)", "sublabel": "window.driversize", "pos": [360, 300], "size": [150, 64] },
+    { "id": "main", "type": "backend", "label": "Processo principal", "sublabel": "IPC · orquestracao", "pos": [600, 300], "size": [150, 64] },
+    { "id": "pool", "type": "backend", "label": "Pool de workers", "sublabel": "fila · worker_threads", "pos": [800, 300], "size": [150, 64] },
+    { "id": "fs", "type": "database", "label": "Sistema de arquivos", "sublabel": "readdir · lstat", "pos": [1000, 300], "size": [150, 64] },
+    { "id": "addon", "type": "backend", "label": "Add-on nativo", "sublabel": "IContextMenu (N-API)", "pos": [600, 140], "size": [150, 60] },
+    { "id": "shell", "type": "external", "label": "Shell do Windows", "sublabel": "verbos · Lixeira", "pos": [1000, 140], "size": [150, 60] },
+    { "id": "settings", "type": "database", "label": "Preferencias JSON", "sublabel": "userData · bounds · filtro", "pos": [595, 470], "size": [160, 60] },
+    { "id": "export", "type": "cloud", "label": "Relatorios", "sublabel": "CSV · XML", "pos": [800, 470], "size": [150, 60] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Processo renderer (contextIsolation)", "wraps": ["ui", "preload"] },
+    { "kind": "region", "label": "Processo principal (Node.js)", "wraps": ["main", "pool", "addon", "settings", "export"] }
+  ],
+  "connections": [
+    { "id": "user-ui", "from": "user", "to": "ui", "variant": "emphasis" },
+    { "id": "ui-preload", "from": "ui", "to": "preload", "variant": "emphasis" },
+    { "id": "preload-main", "from": "preload", "to": "main", "label": "IPC", "variant": "emphasis" },
+    { "id": "main-pool", "from": "main", "to": "pool", "variant": "emphasis" },
+    { "id": "pool-fs", "from": "pool", "to": "fs", "variant": "emphasis" },
+    { "id": "main-addon", "from": "main", "to": "addon", "label": "shell:contextMenu", "variant": "dashed", "fromSide": "top", "toSide": "bottom" },
+    { "id": "addon-shell", "from": "addon", "to": "shell", "label": "menu nativo", "variant": "emphasis" },
+    { "id": "main-settings", "from": "main", "to": "settings", "label": "settings:get / set", "variant": "dashed", "fromSide": "bottom", "toSide": "top", "labelDy": 26 },
+    { "id": "main-export", "from": "main", "to": "export", "label": "export:csv / xml", "variant": "dashed", "fromSide": "right", "toSide": "top", "via": [[775, 332], [775, 440], [875, 440]] },
+    { "id": "export-fs", "from": "export", "to": "fs", "label": "grava arquivo", "variant": "dashed", "fromSide": "right", "toSide": "bottom", "via": [[1075, 500]] }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Renderer isolado", "items": ["Todo dado de disco chega por IPC", "contextIsolation ligado, nodeIntegration desligado", "O renderer so enxerga window.driversize"] },
+    { "dot": "emerald", "title": "Paralelismo controlado", "items": ["Main enumera a raiz; workers varrem as subpastas", "1..N threads, limitadas pelo numero de pastas", "Cancelamento por SharedArrayBuffer + Atomics"] },
+    { "dot": "rose", "title": "Integracao com o Windows", "items": ["Add-on N-API abre o IContextMenu real", "Se o addon faltar, cai no menu proprio", "Lixeira, dialogos e Propriedades via shell"] }
+  ]
+}

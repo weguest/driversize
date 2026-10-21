@@ -1,0 +1,22 @@
+html, body { margin: 0; padding: 0; height: 100%; background: #fff; }
+* { box-sizing: border-box; }
+
+/*
+ * Scrollbars are not part of the theme tokens, so the dark surface used to show
+ * the white native bars. Styling them here (global sheet, outside the component's
+ * emulated encapsulation) covers every scroller: table, sidebar, dialogs and the
+ * long lists in the tools.
+ */
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: #c9cfd6;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: #b3bbc4; background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+
+.app[data-theme='dark'] ::-webkit-scrollbar-thumb { background: #4a515b; background-clip: padding-box; }
+.app[data-theme='dark'] ::-webkit-scrollbar-thumb:hover { background: #5c646f; background-clip: padding-box; }

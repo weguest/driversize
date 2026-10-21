@@ -1,0 +1,107 @@
+{
+  "name": "driversize",
+  "productName": "DriverSize",
+  "version": "1.2.1",
+  "description": "DriverSize - disk usage analyzer (Electron + Angular)",
+  "author": "DriverSize",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "ng": "ng",
+    "build": "ng build",
+    "build:electron": "tsc -p electron/tsconfig.json",
+    "build:native": "cd native/shellmenu && node-gyp rebuild",
+    "electron": "electron .",
+    "start": "npm run build && npm run build:electron && electron .",
+    "dev": "npm run build:electron && concurrently -k \"ng serve --port 4200\" \"wait-on tcp:4200 && cross-env FS_DEV_URL=http://localhost:4200 electron .\"",
+    "test": "ng test",
+    "pack": "npm run build && npm run build:electron && electron-builder --win --dir",
+    "dist": "npm run build && npm run build:electron && electron-builder --win",
+    "dist:portable": "npm run build && npm run build:electron && electron-builder --win portable"
+  },
+  "build": {
+    "appId": "com.driversize.app",
+    "productName": "DriverSize",
+    "copyright": "Copyright © 2026 DriverSize",
+    "directories": {
+      "output": "release"
+    },
+    "electronDist": "node_modules/electron/dist",
+    "npmRebuild": false,
+    "asar": true,
+    "asarUnpack": [
+      "native/shellmenu/build/Release/*.node"
+    ],
+    "files": [
+      "dist-electron/**/*",
+      "dist/driversize/**/*",
+      "native/shellmenu/build/Release/*.node",
+      "assets/icon.ico",
+      "assets/icon.png",
+      "assets/splash.jpg",
+      "package.json"
+    ],
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "DriverSize",
+      "artifactName": "DriverSize-${version}-setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "DriverSize-${version}-portable.${ext}"
+    }
+  },
+  "prettier": {
+    "printWidth": 100,
+    "singleQuote": true,
+    "overrides": [
+      {
+        "files": "*.html",
+        "options": {
+          "parser": "angular"
+        }
+      }
+    ]
+  },
+  "private": true,
+  "dependencies": {
+    "@angular/common": "^20.3.0",
+    "@angular/compiler": "^20.3.0",
+    "@angular/core": "^20.3.0",
+    "@angular/forms": "^20.3.0",
+    "@angular/platform-browser": "^20.3.0",
+    "@angular/router": "^20.3.0",
+    "node-addon-api": "^8.9.2",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0",
+    "zone.js": "~0.15.0"
+  },
+  "devDependencies": {
+    "@angular/build": "^20.3.40",
+    "@angular/cli": "^20.3.40",
+    "@angular/compiler-cli": "^20.3.0",
+    "@types/jasmine": "~5.1.0",
+    "@types/node": "^26.6.5",
+    "concurrently": "^10.0.6",
+    "cross-env": "^10.1.0",
+    "electron": "^44.8.0",
+    "electron-builder": "^26.15.3",
+    "jasmine-core": "~5.9.0",
+    "karma": "~6.4.0",
+    "karma-chrome-launcher": "~3.2.0",
+    "karma-coverage": "~2.2.0",
+    "karma-jasmine": "~5.1.0",
+    "karma-jasmine-html-reporter": "~2.1.0",
+    "typescript": "~5.9.2",
+    "wait-on": "^9.5.1"
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Pipeline de varredura — dos bytes ao relatorio",
+    "subtitle": "Entrada, coleta paralela, agregacao em memoria, visao filtrada e saida",
+    "output": "driversize-pipeline.dataflow.html",
+    "viewBox": [1100, 720],
+    "quality_profile": "standard",
+    "views": [
+      { "id": "collect", "label": "Coleta", "focus": ["pick", "drives", "main", "pool"], "note": "A pasta alvo vira uma fila de subpastas distribuida pelos workers." },
+      { "id": "model", "label": "Modelo agregado", "focus": ["bus", "tree"], "note": "Cada lote sobe pela arvore somando tamanho, arquivos e pastas." },
+      { "id": "present", "label": "Visao e saida", "focus": ["view", "rows", "table", "report"], "note": "Filtrar e podar em memoria; ordenar e exportar sao passos separados." }
+    ]
+  },
+  "stages": [
+    { "label": "Entrada" },
+    { "label": "Coleta" },
+    { "label": "Agregacao" },
+    { "label": "Visao filtrada" },
+    { "label": "Saida" }
+  ],
+  "nodes": [
+    { "id": "pick", "type": "frontend", "label": "Pasta alvo", "sublabel": "usuario", "stage": 0, "row": 1, "tag": "startScan" },
+    { "id": "drives", "type": "database", "label": "Drives", "sublabel": "statfs · cluster", "stage": 0, "row": 3 },
+    { "id": "main", "type": "backend", "label": "Main", "sublabel": "raiz + IPC", "stage": 1, "row": 1 },
+    { "id": "pool", "type": "backend", "label": "Worker Pool", "sublabel": "1..N threads", "stage": 1, "row": 3 },
+    { "id": "bus", "type": "messagebus", "label": "scan:batch", "sublabel": "progress · IPC", "stage": 2, "row": 1 },
+    { "id": "tree", "type": "database", "label": "Arvore agregada", "sublabel": "size · files · folders", "stage": 2, "row": 3 },
+    { "id": "view", "type": "backend", "label": "viewRoot", "sublabel": "poda pelo filtro", "stage": 3, "row": 1 },
+    { "id": "rows", "type": "database", "label": "rows", "sublabel": "filhos + ordenacao", "stage": 3, "row": 3 },
+    { "id": "table", "type": "frontend", "label": "Tabela + donut", "sublabel": "render", "stage": 4, "row": 1 },
+    { "id": "report", "type": "cloud", "label": "CSV / XML", "sublabel": "relatorio", "stage": 4, "row": 3 }
+  ],
+  "flows": [
+    { "id": "f-pick", "from": "pick", "to": "main", "label": "startScan(root)", "classification": "comando", "variant": "emphasis" },
+    { "id": "f-drives", "from": "drives", "to": "main", "label": "cluster (statfs)", "classification": "4 KiB tipico", "variant": "dashed" },
+    { "id": "f-queue", "from": "main", "to": "pool", "label": "subpastas", "classification": "fila", "variant": "emphasis" },
+    { "id": "f-root", "from": "main", "to": "bus", "label": "batch da raiz", "classification": "500 itens", "variant": "emphasis" },
+    { "id": "f-batch", "from": "pool", "to": "bus", "label": "lotes", "classification": "workers", "variant": "emphasis" },
+    { "id": "f-aggregate", "from": "bus", "to": "tree", "label": "onBatch", "classification": "soma bottom-up", "variant": "emphasis" },
+    { "id": "f-prune", "from": "tree", "to": "view", "label": "podar", "classification": "filtro ativo", "variant": "emphasis" },
+    { "id": "f-sort", "from": "view", "to": "rows", "label": "filhos diretos", "classification": "com sort", "variant": "emphasis" },
+    { "id": "f-table", "from": "rows", "to": "table", "label": "linhas", "classification": "top 14 no donut", "variant": "emphasis" },
+    { "id": "f-report", "from": "rows", "to": "report", "label": "exportar", "classification": "CSV / XML", "variant": "dashed", "labelDy": 32 }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Entrada", "items": ["A pasta alvo vem do seletor, do caminho digitado ou de um drive", "O tamanho de cluster (statfs) define o tamanho alocado", "Symlinks e juncoes sao pulados para evitar ciclos"] },
+    { "dot": "emerald", "title": "Coleta paralela", "items": ["Main le a raiz; workers varrem as subpastas", "Lotes de 500 itens e progresso a cada 200 ms", "Acesso negado e ignorado, sem abortar o scan"] },
+    { "dot": "amber", "title": "Memoria e saida", "items": ["A agregacao sobe ate a raiz a cada lote", "Filtrar poda a arvore sem reescanear", "Exportar usa a arvore completa, ignorando o filtro"] }
+  ]
+}

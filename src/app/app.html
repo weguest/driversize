@@ -1,0 +1,1062 @@
+<div class="app" [attr.data-theme]="scan.theme()" [class.compact]="scan.density() === 'compact'">
+  <!-- ===================== title bar (frameless) ===================== -->
+  <header class="titlebar">
+    <img class="tb-logo" src="icon.png" alt="" />
+    <div class="tb-titles">
+      <div class="tb-name">{{ appName }}</div>
+      <div class="tb-sub">{{ t('appSubtitle') }}</div>
+    </div>
+  </header>
+
+  <!-- ===================== action bar ===================== -->
+  <div class="topbar">
+    <!-- back / forward / up: the same actions as Alt+←, Alt+→ and Alt+↑ -->
+    <div class="navgroup">
+      <button class="btn icon" [disabled]="!scan.canBack()" (click)="back()" [title]="t('back')" [attr.aria-label]="t('back')">
+        <svg class="ico" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+          <path d="M9.8 3.4 5.2 8l4.6 4.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+      <button class="btn icon" [disabled]="!scan.canForward()" (click)="forward()" [title]="t('forward')" [attr.aria-label]="t('forward')">
+        <svg class="ico" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+          <path d="M6.2 3.4 10.8 8l-4.6 4.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+      <button class="btn icon" [disabled]="!canUp()" (click)="up()" [title]="t('upLevel')" [attr.aria-label]="t('upLevel')">
+        <svg class="ico" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+          <path d="M8 12.8V3.6M3.6 8 8 3.6l4.4 4.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+    </div>
+    <span class="nav-sep"></span>
+
+    <div class="pathbox">
+      @if (pathEditing()) { <span class="pb-ico">📁</span> }
+      <input #pbInput class="pb-input" [value]="pathInput()" (input)="pathInput.set($any($event.target).value)"
+             (focus)="pathEditing.set(true)" (blur)="endEditPath()"
+             (keyup.enter)="scanPath(); $any($event.target).blur()" (keyup.escape)="endEditPath(); $any($event.target).blur()"
+             [placeholder]="t('pathPlaceholder')" />
+      @if (!pathEditing()) {
+        <!-- Breadcrumb track (shown until the field is focused for typing). -->
+        <div class="pb-crumbs" (click)="editPath()" [title]="t('pathEditTitle')">
+          <button type="button" class="cr" [class.on]="overview()" (click)="$event.stopPropagation(); openOverview()">
+            <svg class="cr-ico" viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+              <rect x="1.6" y="3" width="12.8" height="8.4" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.4" />
+              <path d="M5.6 13.2h4.8M8 11.4v1.8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+            </svg>
+            <span>{{ t('thisPc') }}</span>
+          </button>
+          @if (!overview()) {
+            @for (c of scan.breadcrumb(); track c.path) {
+              <span class="cr-sep">›</span>
+              <button type="button" class="cr" (click)="$event.stopPropagation(); gotoSeg(c.path)" [title]="c.path">
+                @if (isDrive(c.name)) {
+                  <svg class="cr-ico" viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+                    <rect x="2" y="4.4" width="12" height="7.6" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.4" />
+                    <path d="M4.4 9.6h1.8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+                  </svg>
+                } @else {
+                  <svg class="cr-ico folder" viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+                    <path d="M1.7 4.4c0-.7.5-1.2 1.2-1.2h3l1.3 1.7h5.9c.7 0 1.2.5 1.2 1.2v5.1c0 .7-.5 1.2-1.2 1.2H2.9c-.7 0-1.2-.5-1.2-1.2z" fill="currentColor" />
+                  </svg>
+                }
+                <span>{{ c.name }}</span>
+              </button>
+            }
+          }
+        </div>
+      }
+      <button class="pb-caret" [title]="t('recentTitle')" (click)="toggleRecent()">▾</button>
+      @if (showRecent()) {
+        <div class="dropdown recent">
+          @if (!scan.recentRoots().length) {
+            <div class="dd-empty">{{ t('recentEmpty') }}</div>
+          }
+          @for (p of scan.recentRoots(); track p) {
+            <button class="dd-item" (click)="pickRecent(p)" [title]="p">
+              <span class="dd-check"></span><span class="dd-label">{{ p }}</span>
+            </button>
+          }
+        </div>
+      }
+    </div>
+
+    @if (scan.scanning()) {
+      <!-- While a scan runs the primary action flips to "stop": the split caret only
+           holds scan *start* actions (recent roots, pick folder), so it is dropped. -->
+      <button class="btn danger" (click)="cancel()" [title]="t('stopTitle')">
+        <svg class="ico" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+          <rect x="3.7" y="3.7" width="8.6" height="8.6" rx="1.6" fill="currentColor" />
+        </svg>
+        {{ t('stop') }}
+      </button>
+    } @else {
+      <div class="split">
+        <button class="btn primary" (mousedown)="keepFocus($event)" (click)="scanPath()">
+          <svg class="ico" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+            <circle cx="6.6" cy="6.6" r="4.4" fill="none" stroke="currentColor" stroke-width="1.7" />
+            <path d="M10 10l4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" fill="none" />
+          </svg>
+          {{ t('scan') }}
+        </button>
+        <button class="btn primary" [title]="t('scanOptionsTitle')" (click)="pick()">▾</button>
+      </div>
+    }
+
+    <button class="btn" (click)="openFilter()" [title]="t('filterTitle')" [class.on]="scan.filter().enabled">
+      <svg class="ico" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+        <path d="M1.7 3h12.6L9.4 8.2v5.1l-2.8 1.6V8.2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+      </svg>
+      {{ t('filtersBtn') }}
+    </button>
+    <button class="btn" (click)="toggleMonitorBtn()" [title]="t('monitorTitle')" [class.on]="scan.monitorEnabled()">
+      <svg class="ico" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+        <rect x="1.6" y="2.6" width="12.8" height="8.6" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.5" />
+        <path d="M5.6 14h4.8M8 11.2V14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none" />
+      </svg>
+      {{ t('monitor') }}
+    </button>
+    <button class="btn" (click)="rescan()" [disabled]="scan.scanning() || !scan.rootPath()"
+            [title]="scan.pendingChanges() ? tf('rescanPendingTitle', { n: scan.pendingChanges() }) : t('rescanTitle')"
+            [class.pending]="scan.pendingChanges() > 0">
+      <svg class="ico" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+        <path d="M13.4 8a5.4 5.4 0 1 1-1.6-3.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+        <path d="M13.6 1.9v3h-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      {{ t('rescan') }}
+      @if (scan.pendingChanges()) { <span class="badge">{{ scan.pendingChanges() }}</span> }
+    </button>
+
+    <!-- duplicate finder / safe cleanup: direct access from the action bar -->
+    <button class="btn icon" (click)="openDupes()" [title]="t('dupesTitle')" [class.on]="showDupes()" [attr.aria-label]="t('dupesTitle')">
+      <svg class="ico" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+        <rect x="1.6" y="1.6" width="8.6" height="8.6" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.5" />
+        <rect x="5.8" y="5.8" width="8.6" height="8.6" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.5" />
+      </svg>
+    </button>
+    <button class="btn icon" (click)="openCleanup()" [title]="t('cleanupTitle')" [class.on]="showCleanup()" [attr.aria-label]="t('cleanupTitle')">
+      <svg class="ico" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+        <path d="M2.6 5.4h10.8M6.2 5.4V3.6c0-.5.4-.9.9-.9h1.8c.5 0 .9.4.9.9v1.8M4.4 5.4l.6 7.4c.05.55.5.95 1.05.95h3.9c.55 0 1-.4 1.05-.95l.6-7.4"
+              fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+    </button>
+
+    <button class="btn icon" (click)="toggleMenu()" [title]="t('moreTitle')" [class.on]="showMenu()">⋮</button>
+
+    @if (showMenu()) {
+      <div class="menu-backdrop" (click)="closeMenu()"></div>
+      <div class="dropdown menu">
+        @for (n of menuTree(); track $index) {
+          @if (n.type === 'separator') {
+            <div class="dd-sep"></div>
+          } @else {
+            <div class="dd-node">
+              <button class="dd-item" [class.disabled]="n.enabled === false" [class.open]="!!n.submenu && openSub() === n.label"
+                      (click)="menuClick(n)">
+                <span class="dd-check">{{ n.submenu ? '' : (menuChecked(n) ? '✓' : '') }}</span>
+                <span class="dd-label">{{ n.label }}</span>
+                @if (n.submenu) { <span class="dd-arrow">▸</span> }
+              </button>
+              @if (n.submenu && openSub() === n.label) {
+                <div class="dropdown submenu">
+                  @for (s of n.submenu; track $index) {
+                    @if (s.type === 'separator') {
+                      <div class="dd-sep"></div>
+                    } @else {
+                      <button class="dd-item" [class.disabled]="s.enabled === false" (click)="menuClick(s)">
+                        <span class="dd-check">{{ menuChecked(s) ? '✓' : '' }}</span>
+                        <span class="dd-label">{{ s.label }}</span>
+                      </button>
+                    }
+                  }
+                </div>
+              }
+            </div>
+          }
+        }
+      </div>
+    }
+  </div>
+
+  <!-- ===================== body ===================== -->
+  <div class="body">
+    <!-- ---------- sidebar ---------- -->
+    <aside class="sidebar">
+      <div class="side-scroll">
+        <button class="nav-item" [class.on]="overview()" (click)="openOverview()">
+          <span class="ni-ico">🏠</span><span class="ni-name">{{ t('navOverview') }}</span>
+        </button>
+
+        <div class="side-sec">
+          <div class="sec-head">{{ t('navFavorites') }}</div>
+          @for (k of scan.knownFolders(); track k.id) {
+            <button class="nav-item sub" [class.on]="isCurrent(k.path)" (click)="openSidebar(k.path)" [title]="k.path">
+              <span class="ni-ico">{{ knownGlyph(k.id) }}</span><span class="ni-name">{{ knownLabel(k.id, k.path) }}</span>
+            </button>
+          }
+          @for (f of scan.favorites(); track f) {
+            <button class="nav-item sub fav" [class.on]="isCurrent(f)" (click)="openSidebar(f)" [title]="f">
+              <span class="ni-ico">⭐</span><span class="ni-name">{{ favName(f) }}</span>
+              <span class="ni-x" [title]="t('favRemoveTitle')" (click)="removeFavorite($event, f)">✕</span>
+            </button>
+          }
+          <button class="nav-item sub add" (click)="addFavorite()">
+            <span class="ni-ico">＋</span><span class="ni-name">{{ t('navAddFolder') }}</span>
+          </button>
+        </div>
+
+        @if (scan.showDriveInfo()) {
+          <div class="side-sec">
+            <div class="sec-head">{{ t('navDrives') }}</div>
+            @for (d of scan.drives(); track d.root) {
+              <button class="drive-item" [class.on]="isCurrent(d.root)" (click)="openSidebar(d.root)"
+                      (contextmenu)="onDriveContextMenu($event, d)" [title]="d.root">
+                <span class="di-top">
+                  <span class="di-name">💽 {{ driveLetter(d) }}</span>
+                  <span class="di-free">{{ tf('driveFreeOf', { free: scan.formatBytes(d.free), total: scan.formatBytes(d.total), pct: i18n.num(drivePct(d), 0) }) }}</span>
+                </span>
+                <span class="di-bar"><span class="di-fill" [class.low]="driveLow(d)" [style.width.%]="drivePct(d)"></span></span>
+              </button>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="side-foot">
+        <button class="nav-item" (click)="openOptions()"><span class="ni-ico">⚙️</span><span class="ni-name">{{ t('navSettings') }}</span></button>
+        <button class="nav-item" (click)="showAbout.set(true)"><span class="ni-ico">ℹ️</span><span class="ni-name">{{ t('navAbout') }}</span></button>
+      </div>
+    </aside>
+
+    <!-- ---------- content ---------- -->
+    <main class="content">
+      <div class="folder-head">
+        <span class="fh-ico">{{ overview() ? '🗂️' : '📁' }}</span>
+        <div class="fh-text">
+          <div class="fh-name">{{ overview() ? t('navOverview') : headName() }}</div>
+          <div class="fh-path" [title]="overview() ? (scan.rootPath() ?? t('thisPc')) : (scan.selectedPath() ?? '')">
+            {{ overview() ? (scan.rootPath() ?? t('thisPc')) : scan.selectedPath() }}
+          </div>
+          <div class="fh-stats">
+            @if (!overview() || overviewHasTree()) {
+              <b>{{ scan.formatBytes(statBytes()) }}</b>
+              <span class="sep">•</span> {{ tf('hdrFiles', { n: i18n.int(statFiles()) }) }}
+              <span class="sep">•</span> {{ tf('hdrFolders', { n: i18n.int(statFolders()) }) }}
+              <span class="sep">•</span> {{ lastScanText() }}
+            } @else {
+              {{ tf('driveFreeOf', { free: scan.formatBytes(drivesFree()), total: scan.formatBytes(drivesTotal()), pct: i18n.num(drivesUsedPct(), 0) }) }}
+            }
+          </div>
+        </div>
+      </div>
+
+      <div class="content-bar">
+        <div class="ctabs">
+          @if (!overview()) {
+            <button class="ctab" [class.on]="contentTab() === 'items'" (click)="contentTab.set('items')">{{ t('tabFilesFolders') }}</button>
+            <button class="ctab" [class.on]="contentTab() === 'types'" (click)="contentTab.set('types')">{{ t('tabFileTypes') }}</button>
+          } @else {
+            <button class="ctab on">{{ t('navOverview') }}</button>
+          }
+        </div>
+        @if (!overview() && contentTab() === 'items') {
+          <div class="viewtoggle">
+            <button class="vt" [class.on]="scan.viewMode() === 'list'" (click)="setView('list')" [title]="t('viewListTitle')">☰</button>
+            <button class="vt" [class.on]="scan.viewMode() === 'grid'" (click)="setView('grid')" [title]="t('viewGridTitle')">▦</button>
+          </div>
+          <select class="sortsel" [value]="scan.sortOption()" (change)="onSortOption($event)">
+            @for (o of sortOptions; track o) {
+              <option [value]="o" [selected]="o === scan.sortOption()">{{ sortLabel(o) }}</option>
+            }
+          </select>
+          <div class="search">
+            <svg class="s-ico" viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+              <circle cx="6.6" cy="6.6" r="4.4" fill="none" stroke="currentColor" stroke-width="1.7" />
+              <path d="M10 10l4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" fill="none" />
+            </svg>
+            <input #searchInput [value]="scan.search()" (input)="setSearch($event)" [placeholder]="t('searchPlaceholder')" />
+            @if (scan.search()) {
+              <button class="s-x" (click)="clearSearch()" [title]="t('searchClear')">✕</button>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- active file-type filter (chips) -->
+      @if (!overview() && scan.extFilter().size) {
+        <div class="extbar">
+          <span class="eb-label">{{ t('typesLabel') }}</span>
+          @for (e of extList(); track e) {
+            <span class="chip" (click)="toggleExt(e)" [title]="t('removeTypeTitle')">{{ e || t('noExt') }} ✕</span>
+          }
+          <button class="chip-clear" (click)="clearExtFilter()">{{ t('clearTypes') }}</button>
+          <span class="eb-info">{{ tf('filesCount', { n: i18n.int(scan.rows().length), size: scan.formatBytes(scan.extMatchedBytes()) }) }}</span>
+        </div>
+      }
+
+      @if (overview()) {
+        @if (overviewHasTree()) {
+          <!-- /visão geral: the folder tree of the analysed folder -->
+          <div class="table-head tree-head">
+            <span class="c-name sortable" (click)="setSort('name')">{{ t('colName') }} {{ arrow('name') }}</span>
+            <span class="c-size sortable" (click)="setSort('size')">{{ t('colSize') }} {{ arrow('size') }}</span>
+            <span class="c-pct">%</span>
+          </div>
+          <div class="table-body tree-body">
+            @for (row of scan.flatTree(); track row.node.path) {
+              <div class="tr tree-row" [class.selrow]="scan.selectedPath() === row.node.path"
+                   [style.paddingLeft.px]="6 + row.depth * 16"
+                   (click)="selectNode(row.node.path)"
+                   (dblclick)="enterFolder(row.node.path)"
+                   (contextmenu)="onNodeContextMenu($event, row.node)">
+                <span class="c-name">
+                  <span class="twisty" (click)="toggleNode($event, row.node.path)">
+                    {{ row.node.children.length ? (row.node.expanded ? '−' : '+') : '·' }}
+                  </span>
+                  <span class="c-ico">{{ row.node.expanded ? '📂' : '📁' }}</span>
+                  {{ row.node.name }}
+                </span>
+                <span class="c-size">{{ scan.formatBytes(row.node.size) }}</span>
+                <span class="c-pct">{{ scan.percent(row.node.size, scan.rootSize() || 1) }}</span>
+              </div>
+            }
+          </div>
+        } @else {
+          <!-- /visão geral without a scan: "Este computador" — the drives -->
+          <div class="pc-panel">
+            <div class="pc-hint">{{ t('treeEmpty') }}</div>
+            <div class="pc-grid">
+              @for (d of scan.drives(); track d.root) {
+                <button class="pc-card" [class.on]="isCurrent(d.root)" (click)="openSidebar(d.root)"
+                        (contextmenu)="onDriveContextMenu($event, d)" [title]="d.root">
+                  <span class="pc-ico">💽</span>
+                  <span class="pc-info">
+                    <span class="pc-name">{{ driveLetter(d) }}</span>
+                    <span class="di-bar"><span class="di-fill" [class.low]="driveLow(d)" [style.width.%]="drivePct(d)"></span></span>
+                    <span class="pc-free">{{ tf('driveFreeOf', { free: scan.formatBytes(d.free), total: scan.formatBytes(d.total), pct: i18n.num(drivePct(d), 0) }) }}</span>
+                  </span>
+                </button>
+              } @empty {
+                <div class="empty">{{ t('treeEmpty') }}</div>
+              }
+            </div>
+          </div>
+        }
+      } @else if (contentTab() === 'items' && scan.viewMode() === 'list') {
+        <!-- /lista -->
+        <div class="table-head" [class.nodisk]="!scan.showDisk()">
+          <span class="c-chk"><input type="checkbox" [checked]="allSelected()" (change)="toggleAll($event)" aria-label="all"></span>
+          <span class="c-ico"></span>
+          <span class="c-name sortable" (click)="setSort('name')">{{ t('colName') }} {{ arrow('name') }}</span>
+          <span class="c-size sortable" (click)="setSort('size')">{{ t('colSize') }} {{ arrow('size') }}</span>
+          @if (scan.showDisk()) {
+            <span class="c-disk sortable" (click)="setSort('allocated')" [title]="t('colDiskHint')">{{ t('colDisk') }} {{ arrow('allocated') }}</span>
+          }
+          <span class="c-pct sortable" (click)="setSort('percent')">% {{ arrow('percent') }}</span>
+          <span class="c-items sortable" (click)="setSort('items')">{{ t('colItems') }} {{ arrow('items') }}</span>
+          <span class="c-type">{{ t('colType') }}</span>
+          <span class="c-date sortable" (click)="setSort('modified')">{{ t('colModified') }} {{ arrow('modified') }}</span>
+        </div>
+        <div class="table-body">
+          @for (r of scan.rows(); track r.path) {
+            <div class="tr" [class.folder]="r.kind === 'folder'" [class.selrow]="isSelected(r.path)"
+                 [class.nodisk]="!scan.showDisk()"
+                 [attr.data-path]="r.path" [title]="rowTooltip(r)"
+                 (click)="onRowClick($event, r, $index)"
+                 (dblclick)="onRowDblClick(r)"
+                 (contextmenu)="onRowContextMenu($event, r)">
+              <span class="c-chk" (click)="$event.stopPropagation()">
+                <input type="checkbox" [checked]="isSelected(r.path)" (change)="toggleRow(r, $event)" aria-label="select">
+              </span>
+              <span class="c-ico">{{ rowGlyph(r) }}</span>
+              <span class="c-name">{{ r.name }}@if (r.sub) {<span class="sub"> — {{ r.sub }}</span>}</span>
+              <span class="c-size">
+                <span class="sz-val">{{ scan.formatBytes(r.size) }}</span>
+                <span class="sz-bar"><span class="sz-fill" [style.width.%]="barWidth(r)"></span></span>
+              </span>
+              @if (scan.showDisk()) {
+                <span class="c-disk" [title]="t('colDiskHint')">{{ scan.formatBytes(r.allocated) }}</span>
+              }
+              <span class="c-pct">{{ scan.percent(r.size, scan.selectedTotal()) }}</span>
+              <span class="c-items">{{ itemsLabel(r) }}</span>
+              <span class="c-type">{{ scan.rowType(r) }}</span>
+              <span class="c-date">{{ i18n.dateShort(r.mtime) }}</span>
+            </div>
+          }
+          @if (!scan.rows().length) {
+            <div class="empty">{{ scan.search() ? t('noResults') : t('detailsEmpty') }}</div>
+          }
+        </div>
+      } @else if (contentTab() === 'items') {
+        <!-- /grade -->
+        <div class="grid">
+          @for (r of scan.rows(); track r.path) {
+            <div class="tile" [class.selrow]="isSelected(r.path)" [title]="r.path"
+                 (click)="onRowClick($event, r, $index)"
+                 (dblclick)="onRowDblClick(r)"
+                 (contextmenu)="onRowContextMenu($event, r)">
+              <span class="t-ico">{{ rowGlyph(r) }}</span>
+              <span class="t-name">{{ r.name }}</span>
+              <span class="t-size">{{ scan.formatBytes(r.size) }}</span>
+              <span class="t-bar"><span class="t-fill" [style.width.%]="barWidth(r)"></span></span>
+            </div>
+          }
+          @if (!scan.rows().length) {
+            <div class="empty">{{ scan.search() ? t('noResults') : t('detailsEmpty') }}</div>
+          }
+        </div>
+      } @else {
+        <!-- /tipos de arquivo -->
+        <div class="table-head types-head">
+          <span class="c-name">{{ t('repExt') }}</span>
+          <span class="c-size">{{ t('colSize') }}</span>
+          <span class="c-pct">%</span>
+          <span class="c-items">{{ t('colFiles') }}</span>
+          <span class="c-type">{{ t('colType') }}</span>
+        </div>
+        <div class="table-body types-body">
+          @for (tp of scan.typeStats(); track tp.ext) {
+            <div class="tr" [class.selrow]="isExtActive(tp.ext)" (click)="toggleExt(tp.ext)" [title]="t('typesHint')">
+              <span class="c-name"><span class="dot" [style.background]="tp.color"></span> {{ tp.label }}</span>
+              <span class="c-size">{{ scan.formatBytes(tp.bytes) }}</span>
+              <span class="c-pct">{{ i18n.num(tp.percent, 1) }}%</span>
+              <span class="c-items">{{ i18n.int(tp.files) }}</span>
+              <span class="c-type">{{ scan.extTypeName(tp.ext) }}</span>
+            </div>
+          }
+          @if (!scan.typeStats().length) {
+            <div class="empty">{{ t('noTypes') }}</div>
+          }
+        </div>
+      }
+    </main>
+
+    <!-- ---------- right panel ---------- -->
+    @if (showChart()) {
+      <aside class="right">
+        <div class="rtabs">
+          <button class="rtab" [class.on]="rightTab() === 'chart'" (click)="rightTab.set('chart')">{{ t('tabChart') }}</button>
+          <button class="rtab" [class.on]="rightTab() === 'types'" (click)="rightTab.set('types')">{{ t('tabTypes') }}</button>
+          <button class="rtab" [class.on]="rightTab() === 'exts'" (click)="rightTab.set('exts')">{{ t('tabExts') }}</button>
+        </div>
+        <div class="rbody">
+          @if (rightTab() === 'chart') {
+            <div class="card-title">{{ t('chartByType') }}</div>
+            @if (scan.categoryPie().length) {
+              <svg viewBox="0 0 240 240" class="pie">
+                @for (s of scan.categoryPie(); track s.label + $index) {
+                  <path [attr.d]="s.d" [attr.fill]="s.color" stroke-width="1.5">
+                    <title>{{ s.label }} — {{ scan.formatBytes(s.size) }} ({{ i18n.num(s.percent, 1) }}%)</title>
+                  </path>
+                }
+                <circle class="pie-hole" cx="120" cy="120" r="56" />
+                <text x="120" y="115" text-anchor="middle" class="pie-total">{{ scan.formatBytes(scan.selectedTotal()) }}</text>
+                <text x="120" y="133" text-anchor="middle" class="pie-sub">{{ tf('chartShown', { n: i18n.int(scan.categoryPie().length) }) }}</text>
+              </svg>
+              <div class="legend">
+                @for (s of scan.categoryPie(); track s.label + $index) {
+                  <div class="lg-row">
+                    <span class="dot" [style.background]="s.color"></span>
+                    <span class="lg-name" [title]="s.label">{{ s.label }}</span>
+                    <span class="lg-val">{{ scan.formatBytes(s.size) }}</span>
+                    <span class="lg-pct">{{ i18n.num(s.percent, 1) }}%</span>
+                  </div>
+                }
+              </div>
+            } @else {
+              <div class="empty">{{ t('noChartData') }}</div>
+            }
+
+            <div class="largest">
+              <div class="largest-head">
+                <span class="card-title">{{ t('largestTitle') }}</span>
+                <span class="links">
+                  <button class="link" (click)="openLargest()" [disabled]="!scan.largestFiles().length">{{ t('largestViewAll') }}</button>
+                  <button class="link" (click)="openLargestDrive()" [disabled]="!scan.rootPath()" [title]="t('largestDriveTitle')">{{ t('largestDrive') }}</button>
+                </span>
+              </div>
+              @for (f of scan.largestFiles().slice(0, 5); track f.path) {
+                <div class="largest-row" (click)="revealFile(f.path)" [title]="f.path">
+                  <span class="lr-ico">{{ fileGlyph(f.ext) }}</span>
+                  <span class="lr-name">{{ f.name }}</span>
+                  <span class="lr-size">{{ scan.formatBytes(f.size) }}</span>
+                </div>
+              }
+              @if (!scan.largestFiles().length) {
+                <div class="empty">{{ t('noTypes') }}</div>
+              }
+            </div>
+          } @else if (rightTab() === 'types') {
+            <div class="card-title">{{ t('tabTypes') }}</div>
+            @for (c of scan.categoryStats(); track c.id) {
+              <div class="lg-row">
+                <span class="dot" [style.background]="c.color"></span>
+                <span class="lg-name" [title]="scan.categoryLabel(c.id)">{{ scan.categoryLabel(c.id) }}</span>
+                <span class="lg-val">{{ scan.formatBytes(c.bytes) }}</span>
+                <span class="lg-pct">{{ i18n.num(c.percent, 1) }}%</span>
+              </div>
+            }
+            @if (!scan.categoryStats().length) {
+              <div class="empty">{{ t('noTypes') }}</div>
+            }
+          } @else {
+            <div class="card-title">{{ t('tabExts') }}</div>
+            @for (tp of scan.typeStats(); track tp.ext) {
+              <div class="lg-row typerow" [class.on]="isExtActive(tp.ext)" (click)="toggleExt(tp.ext)" [title]="t('typesHint')">
+                <span class="dot" [style.background]="tp.color"></span>
+                <span class="lg-name">{{ tp.label }}</span>
+                <span class="lg-cnt">{{ i18n.int(tp.files) }}</span>
+                <span class="lg-val">{{ scan.formatBytes(tp.bytes) }}</span>
+                <span class="lg-pct">{{ i18n.num(tp.percent, 1) }}%</span>
+              </div>
+            }
+            @if (!scan.typeStats().length) {
+              <div class="empty">{{ t('noTypes') }}</div>
+            }
+            <div class="types-hint">{{ t('typesHint') }}</div>
+          }
+        </div>
+      </aside>
+    }
+  </div>
+
+  <!-- ===================== status bar ===================== -->
+  <footer class="statusbar">
+    <span class="sb-state" [class.busy]="scan.scanning()" [class.err]="!!scan.error()"
+          [class.info]="!!scan.notice() && !scan.scanning() && !scan.error()">
+      <span class="sb-dot"></span>
+      {{ scan.scanning() ? t('scanning') : (scan.error() ? scan.error() : (scan.notice() || t('ready'))) }}
+    </span>
+    @if (scan.scanning() && scan.currentDir(); as cur) {
+      <span class="sb-item sb-dir" [title]="cur">
+        <svg class="ico" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+          <path d="M1.8 4.2c0-.6.5-1.1 1.1-1.1h3l1.2 1.4h5.9c.6 0 1.1.5 1.1 1.1v5.1c0 .6-.5 1.1-1.1 1.1H2.9c-.6 0-1.1-.5-1.1-1.1z"
+                fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
+        </svg>
+        <span class="sb-dir-text" #sbDirText>{{ shortDir(cur) }}</span>
+      </span>
+    }
+    <span class="sb-item">{{ tf('hdrFiles', { n: i18n.int(statFiles()) }) }}</span>
+    <span class="sb-item">{{ tf('hdrFolders', { n: i18n.int(statFolders()) }) }}</span>
+    <span class="sb-item sb-strong">{{ scan.formatBytes(statBytes()) }}</span>
+    @if (scan.elapsedMs()) {
+      <span class="sb-item">{{ i18n.num(scan.elapsedMs() / 1000, 1) }}s</span>
+    }
+    @if (scan.scanning() && scan.rate() >= 1) {
+      <span class="sb-item">{{ tf('scanRate', { n: i18n.int(rateInt()) }) }}</span>
+    }
+    @if (currentDrive(); as d) {
+      <span class="sb-right">
+        <span class="sb-item">{{ tf('driveUsage', { d: driveLetter(d) }) }}</span>
+        <span class="sb-bar"><span class="sb-fill" [class.low]="driveLow(d)" [style.width.%]="drivePct(d)"></span></span>
+        <span class="sb-item">{{ tf('driveFreeOf', { free: scan.formatBytes(d.free), total: scan.formatBytes(d.total), pct: i18n.num(drivePct(d), 0) }) }}</span>
+      </span>
+    }
+  </footer>
+
+  <!-- ===================== rename modal ===================== -->
+  @if (renameTarget()) {
+    <div class="modal-overlay" (click)="cancelRename()">
+      <div class="modal small" (click)="$event.stopPropagation()">
+        <div class="modal-head">{{ t('renameTitle') }}</div>
+        <div class="modal-body">
+          <input class="mi wide" [value]="renameName()" (input)="renameName.set($any($event.target).value)" (keyup.enter)="confirmRename()">
+        </div>
+        <div class="modal-foot">
+          <span class="spacer"></span>
+          <button (click)="cancelRename()">{{ t('cancel') }}</button>
+          <button class="primary" (click)="confirmRename()">{{ t('rename') }}</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ===================== largest files modal ===================== -->
+  @if (showLargest()) {
+    <div class="modal-overlay" (click)="closeLargest()">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <div class="modal-head">{{ t('largestTitle') }} <span class="mh-sub">{{ t('largestSub') }}</span></div>
+        <div class="modal-body">
+          <div class="table-head modal-table-head">
+            <span class="c-ico"></span>
+            <span class="c-name">{{ t('colName') }}</span>
+            <span class="c-size">{{ t('colSize') }}</span>
+            <span class="c-pct">%</span>
+            <span class="c-type">{{ t('colType') }}</span>
+          </div>
+          <div class="scroll-list">
+            @for (f of scan.largestFiles(); track f.path) {
+              <div class="tr" (click)="closeLargest(); revealFile(f.path)" [title]="f.path">
+                <span class="c-ico">{{ fileGlyph(f.ext) }}</span>
+                <span class="c-name">{{ f.name }}</span>
+                <span class="c-size">{{ scan.formatBytes(f.size) }}</span>
+                <span class="c-pct">{{ i18n.num(f.percent, 1) }}%</span>
+                <span class="c-type">{{ scan.extTypeName(f.ext) }}</span>
+              </div>
+            }
+          </div>
+        </div>
+        <div class="modal-foot">
+          <span class="spacer"></span>
+          <button class="primary" (click)="closeLargest()">{{ t('close') }}</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ===================== largest files of the drive ===================== -->
+  @if (showLargestDrive()) {
+    <div class="modal-overlay" (click)="closeLargestDrive()">
+      <div class="modal wide" (click)="$event.stopPropagation()">
+        <div class="modal-head">
+          {{ t('largestDriveTitle') }}
+          <span class="mh-sub">{{ tf('largestDriveSub', { path: scan.rootPath() ?? '' }) }}</span>
+        </div>
+        <div class="modal-body">
+          <div class="table-head modal-table-head largest-all-head">
+            <span class="c-ico"></span>
+            <span class="c-name">{{ t('colName') }}</span>
+            <span class="c-size">{{ t('colSize') }}</span>
+            <span class="c-pct">%</span>
+            <span class="c-type">{{ t('colType') }}</span>
+            <span class="c-act"></span>
+          </div>
+          <div class="scroll-list scroll-tall">
+            @for (f of scan.globalLargestFiles(); track f.path) {
+              <div class="tr largest-all-row" (click)="showInFolder(f.path)"
+                   (contextmenu)="onFileContextMenu($event, f.path)" [title]="f.path">
+                <span class="c-ico">{{ fileGlyph(f.ext) }}</span>
+                <span class="c-name">
+                  {{ f.name }}<span class="sub" [title]="f.dir"> — {{ f.dir }}</span>
+                </span>
+                <span class="c-size">{{ scan.formatBytes(f.size) }}</span>
+                <span class="c-pct">{{ i18n.num(f.percent, 1) }}%</span>
+                <span class="c-type">{{ scan.extTypeName(f.ext) }}</span>
+                <span class="c-act">
+                  <button class="ibtn" (click)="openFile(f.path); $event.stopPropagation()" [title]="t('openFileAction')">↗</button>
+                  <button class="ibtn" (click)="showInFolder(f.path); $event.stopPropagation()" [title]="t('revealAction')">📂</button>
+                </span>
+              </div>
+            }
+            @if (!scan.globalLargestFiles().length) {
+              <div class="empty">{{ t('largestDriveEmpty') }}</div>
+            }
+          </div>
+        </div>
+        <div class="modal-foot">
+          <span class="hint">{{ tf('largestDriveCount', { n: i18n.int(scan.globalLargestFiles().length) }) }}</span>
+          <span class="spacer"></span>
+          <button class="primary" (click)="closeLargestDrive()">{{ t('close') }}</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ===================== duplicate finder ===================== -->
+  @if (showDupes()) {
+    <div class="modal-overlay" (click)="closeDupes()">
+      <div class="modal wide" (click)="$event.stopPropagation()">
+        <div class="modal-head">
+          {{ t('dupesTitle') }}
+          <span class="mh-sub">{{ scan.rootPath() ?? '' }}</span>
+        </div>
+        <div class="modal-body">
+          @if (!scan.rootPath()) {
+            <div class="empty">{{ t('dupesNoScan') }}</div>
+          } @else {
+            <div class="frow dupes-bar">
+              <span class="fl">{{ t('dupesMinLabel') }}</span>
+              <select (change)="setDupeMin($event)" [disabled]="scan.dupeState() === 'running'">
+                @for (o of dupeMinOptions; track o.v) {
+                  <option [value]="o.v" [selected]="scan.dupeMinSize() === o.v">{{ o.label }}</option>
+                }
+              </select>
+              @if (scan.dupeState() !== 'running') {
+                <button (click)="startDupes()">{{ scan.dupeState() === 'done' ? t('dupesRestart') : t('dupesStart') }}</button>
+              } @else {
+                <button class="danger" (click)="cancelDupes()">{{ t('stop') }}</button>
+              }
+              <span class="spacer"></span>
+              @if (scan.dupeState() === 'done') {
+                <span class="hint">
+                  {{ tf('dupesSummary', { groups: i18n.int(scan.dupes().length), size: scan.formatBytes(scan.dupeWasted()) }) }}
+                  · {{ i18n.num(scan.dupeElapsedMs() / 1000, 1) }} s
+                </span>
+              }
+            </div>
+
+            @if (scan.dupeState() === 'running') {
+              @if (scan.dupeProgress(); as pg) {
+                <div class="dupes-progress">
+                  <div class="dp-label">
+                    {{ pg.phase === 'full' ? t('dupesPhaseFull') : t('dupesPhasePartial') }}
+                    <span class="hint">{{ i18n.int(pg.done) }} / {{ i18n.int(pg.total) }}</span>
+                  </div>
+                  <div class="dp-track">
+                    <div class="dp-fill" [style.width.%]="pg.total ? (pg.done / pg.total) * 100 : 0"></div>
+                  </div>
+                </div>
+              }
+            }
+
+            @if (scan.dupeState() === 'error') {
+              <div class="empty">{{ t('dupesError') }} — {{ scan.dupeError() }}</div>
+            }
+            @if (scan.dupeState() === 'done' && !scan.dupes().length) {
+              <div class="empty">{{ t('dupesNone') }}</div>
+            }
+
+            @if (scan.dupes().length) {
+              <div class="dupes-list">
+                @for (g of scan.dupes(); track g.paths[0]) {
+                  <div class="dupe-group">
+                    <div class="dg-head" (click)="toggleDupeGroup(g)" [title]="t('dupesToggleGroup')">
+                      <span class="dg-size">{{ scan.formatBytes(g.size) }}</span>
+                      <span class="dg-meta">{{ tf('dupesGroupMeta', { n: i18n.int(g.paths.length), size: scan.formatBytes(g.size) }) }}</span>
+                      <span class="spacer"></span>
+                      <span class="dg-waste">{{ tf('dupesWaste', { size: scan.formatBytes(g.size * (g.paths.length - 1)) }) }}</span>
+                    </div>
+                    @for (p of g.paths; track p) {
+                      <label class="dupe-row" [class.keep]="isDupeKeeper(g, p)">
+                        <input type="checkbox" [checked]="isDupeChecked(p)" [disabled]="isDupeKeeper(g, p)" (change)="toggleDupe(p)" />
+                        <span class="dr-name" [title]="p">{{ dupeName(p) }}</span>
+                        <span class="dr-dir" [title]="p">{{ dupeDir(p) }}</span>
+                        <button class="ibtn" (click)="showInFolder(p); $event.preventDefault(); $event.stopPropagation()" [title]="t('revealAction')">📂</button>
+                        <span class="dr-keep">{{ isDupeKeeper(g, p) ? t('dupesKeep') : '' }}</span>
+                      </label>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          }
+        </div>
+        <div class="modal-foot">
+          @if (scan.dupes().length) {
+            <span class="hint">{{ tf('dupesSelected', { n: i18n.int(dupeSelected().size), size: scan.formatBytes(dupeSelectedBytes()) }) }}</span>
+          }
+          <span class="spacer"></span>
+          <button (click)="closeDupes()">{{ t('close') }}</button>
+          <button class="danger" [disabled]="!dupeSelected().size" (click)="deleteDupeSelected()">{{ t('dupesDeleteSel') }}</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ===================== safe cleanup ===================== -->
+  @if (showCleanup()) {
+    <div class="modal-overlay" (click)="closeCleanup()">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <div class="modal-head">
+          {{ t('cleanupTitle') }}
+          <span class="mh-sub">{{ t('cleanupSub') }}</span>
+        </div>
+        <div class="modal-body">
+          @if (scan.cleanSummary(); as sum) {
+            <div class="clean-summary">
+              {{ tf('cleanupResult', { size: scan.formatBytes(sum.freed), n: i18n.int(sum.files) }) }}
+              @if (sum.errors) {
+                <span class="warn"> · {{ tf('cleanupErrors', { n: i18n.int(sum.errors) }) }}</span>
+              }
+              @if (scan.lastCleanup()?.log) {
+                <button class="link" (click)="openCleanLog()">{{ t('cleanupOpenLog') }}</button>
+              }
+            </div>
+          } @else if (scan.lastCleanup(); as last) {
+            <div class="clean-last">
+              {{ tf('cleanupLast', { date: i18n.dateShort(last.at), size: scan.formatBytes(last.freed) }) }}
+              @if (last.log) {
+                <button class="link" (click)="openCleanLog()">{{ t('cleanupOpenLog') }}</button>
+              }
+            </div>
+          }
+          <div class="clean-list">
+            @for (row of cleanRows(); track row.target.id) {
+              <label class="clean-row" [class.disabled]="row.target.infoOnly" [class.busy]="row.target.state === 'measuring'">
+                <input type="checkbox" [checked]="isCleanChecked(row.target.id)"
+                       [disabled]="row.target.infoOnly || scan.cleanState() === 'deleting'"
+                       (change)="toggleClean(row.target.id)" />
+                <span class="cl-text">
+                  <span class="cl-name">{{ row.label }}</span>
+                  <span class="cl-desc">{{ row.desc }}</span>
+                </span>
+                <span class="cl-badges">
+                  @if (row.target.needsAdmin) { <span class="cl-badge">{{ t('cleanupAdmin') }}</span> }
+                  @if (row.target.infoOnly) { <span class="cl-badge">{{ t('cleanupInfoOnly') }}</span> }
+                </span>
+                <span class="cl-state">{{ cleanStateLabel(row.target) }}</span>
+                <span class="cl-size">{{ row.target.size ? scan.formatBytes(row.target.size) : '—' }}</span>
+              </label>
+            }
+            @if (!cleanRows().length) {
+              <div class="empty">{{ t('cleanupMeasuring') }}</div>
+            }
+          </div>
+          @if (cleanConfirm()) {
+            <div class="clean-warn">{{ t('cleanupConfirmWarn') }}</div>
+          }
+        </div>
+        <div class="modal-foot">
+          <span class="hint">{{ tf('cleanupSelected', { n: i18n.int(cleanSelectedIds().size), size: scan.formatBytes(cleanSelectedBytes()) }) }}</span>
+          <span class="spacer"></span>
+          @if (scan.cleanState() === 'measuring') {
+            <button (click)="closeCleanup()">{{ t('cleanupCancel') }}</button>
+          } @else {
+            <button (click)="restartCleanup()" [disabled]="scan.cleanState() !== 'idle'">{{ t('cleanupRescan') }}</button>
+            <button class="danger" [disabled]="!cleanSelectedIds().size || scan.cleanState() !== 'idle'" (click)="applyCleanup()">
+              {{ cleanConfirm() ? t('cleanupConfirmBtn') : t('cleanupDelete') }}
+            </button>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ===================== filter modal ===================== -->
+  @if (showFilter()) {
+    <div class="modal-overlay" (click)="closeFilter()">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <div class="modal-head">{{ t('filter') }} <span class="mh-sub">{{ t('filterSub') }}</span></div>
+        <div class="modal-body">
+          <div class="frow">
+            <span class="fl">{{ t('includeLabel') }}</span>
+            <label class="chk"><input type="checkbox" [checked]="draft().includeFiles" (change)="setDraft({ includeFiles: $any($event.target).checked })"> {{ t('includeFiles') }}</label>
+            <label class="chk"><input type="checkbox" [checked]="draft().includeFolders" (change)="setDraft({ includeFolders: $any($event.target).checked })"> {{ t('includeFolders') }}</label>
+            <label class="chk"><input type="checkbox" [checked]="draft().invert" (change)="setDraft({ invert: $any($event.target).checked })"> {{ t('invertLabel') }}</label>
+          </div>
+
+          <div class="frow">
+            <span class="fl">{{ t('nameMasks') }}</span>
+            <input class="mi" placeholder="*.txt;report*;*.jpg" [value]="draft().masks" (input)="setDraft({ masks: $any($event.target).value })">
+            <label class="chk">{{ t('maskSeparator') }} <input class="sep" maxlength="1" [value]="draft().maskSeparator" (input)="setDraft({ maskSeparator: $any($event.target).value })"></label>
+          </div>
+
+          <div class="frow">
+            <label class="chk"><input type="checkbox" [checked]="draft().sizeEnabled" (change)="setDraft({ sizeEnabled: $any($event.target).checked })"> <b>{{ t('sizeLabel') }}</b></label>
+            <select [value]="draft().sizeMode" (change)="setDraft({ sizeMode: $any($event.target).value, sizeEnabled: true })">
+              <option value="gt">{{ t('opGt') }}</option>
+              <option value="lt">{{ t('opLt') }}</option>
+              <option value="between">{{ t('opBetween') }}</option>
+              <option value="outside">{{ t('opOutside') }}</option>
+            </select>
+            <input class="num" type="number" min="0" step="any" [value]="draft().sizeMinMB" (input)="setDraft({ sizeMinMB: +$any($event.target).value, sizeEnabled: true })">
+            @if (draft().sizeMode === 'between' || draft().sizeMode === 'outside') {
+              <span class="sep-word">{{ t('andWord') }}</span>
+              <input class="num" type="number" min="0" step="any" [value]="draft().sizeMaxMB" (input)="setDraft({ sizeMaxMB: +$any($event.target).value, sizeEnabled: true })">
+            }
+            <select [value]="draft().sizeUnit" (change)="setDraft({ sizeUnit: $any($event.target).value, sizeEnabled: true })">
+              <option value="KB">KB</option>
+              <option value="MB">MB</option>
+              <option value="GB">GB</option>
+            </select>
+          </div>
+
+          <div class="frow">
+            <label class="chk"><input type="checkbox" [checked]="draft().attrEnabled" (change)="setDraft({ attrEnabled: $any($event.target).checked })"> <b>{{ t('attrLabel') }}</b></label>
+            <select [value]="draft().attrMode" (change)="setDraft({ attrMode: $any($event.target).value, attrEnabled: true })">
+              <option value="all">{{ t('attrAll') }}</option>
+              <option value="none">{{ t('attrNone') }}</option>
+              <option value="exact">{{ t('attrExact') }}</option>
+            </select>
+            @for (a of attrBits(); track a.bit) {
+              <label class="chk"><input type="checkbox" [checked]="draftAttr(a.bit)" (change)="toggleDraftAttr(a.bit)"> {{ a.label }}</label>
+            }
+          </div>
+
+          <div class="frow">
+            <label class="chk"><input type="checkbox" [checked]="draft().dateEnabled" (change)="setDraft({ dateEnabled: $any($event.target).checked })"> <b>{{ t('dateLabel') }}</b></label>
+            <select [value]="draft().dateField" (change)="setDraft({ dateField: $any($event.target).value, dateEnabled: true })">
+              <option value="created">{{ t('dateCreated') }}</option>
+              <option value="accessed">{{ t('dateAccessed') }}</option>
+              <option value="modified">{{ t('dateModified') }}</option>
+            </select>
+            <select [value]="draft().dateMode" (change)="setDraft({ dateMode: $any($event.target).value, dateEnabled: true })">
+              <option value="after">{{ t('dateAfter') }}</option>
+              <option value="before">{{ t('dateBefore') }}</option>
+              <option value="between">{{ t('dateBetween') }}</option>
+            </select>
+            <input type="date" [value]="draft().dateFrom" (input)="setDraft({ dateFrom: $any($event.target).value, dateEnabled: true })">
+            @if (draft().dateMode === 'between') {
+              <span class="sep-word">{{ t('andWord') }}</span>
+              <input type="date" [value]="draft().dateTo" (input)="setDraft({ dateTo: $any($event.target).value, dateEnabled: true })">
+            }
+          </div>
+        </div>
+        <div class="modal-foot">
+          <span class="fhint">{{ tf('foldersInResult', { n: i18n.int(scan.flatTree().length) }) }}</span>
+          <span class="spacer"></span>
+          <button (click)="clearFilterNow()">{{ t('clear') }}</button>
+          <button (click)="closeFilter()">{{ t('cancel') }}</button>
+          <button class="primary" (click)="applyFilter()">{{ t('apply') }}</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ===================== options modal ===================== -->
+  @if (showOptions()) {
+    <div class="modal-overlay" (click)="closeOptions()">
+      <div class="modal options-modal" (click)="$event.stopPropagation()">
+        <div class="modal-head">{{ t('optionsTitle') }}</div>
+        <div class="modal-body">
+          <div class="opt-grid">
+            <span class="fl">{{ t('themeLabel') }}</span>
+            <select (change)="setOpt({ theme: $any($event.target).value })">
+              <option value="system" [selected]="optDraft().theme === 'system'">{{ t('themeSystem') }}</option>
+              <option value="light" [selected]="optDraft().theme === 'light'">{{ t('themeLight') }}</option>
+              <option value="dark" [selected]="optDraft().theme === 'dark'">{{ t('themeDark') }}</option>
+            </select>
+
+            <span class="fl">{{ t('densityLabel') }}</span>
+            <select (change)="setOpt({ density: $any($event.target).value })">
+              <option value="normal" [selected]="optDraft().density === 'normal'">{{ t('densityNormal') }}</option>
+              <option value="compact" [selected]="optDraft().density === 'compact'">{{ t('densityCompact') }}</option>
+            </select>
+
+            <span class="fl">{{ t('languageLabel') }}</span>
+            <select (change)="setOpt({ lang: $any($event.target).value })">
+              @for (l of langs; track l.id) {
+                <option [value]="l.id" [selected]="l.id === optDraft().lang">{{ l.name }}</option>
+              }
+            </select>
+
+            <span class="fl">{{ t('sizeUnitLabel') }}</span>
+            <span class="opt-units">
+              @for (u of optUnits; track u) {
+                <button class="unit" [class.active]="optDraft().unit === u" (click)="setOpt({ unit: u })">{{ u.toUpperCase() }}</button>
+              }
+            </span>
+
+            <span class="fl">{{ t('showLabel') }}</span>
+            <span class="opt-checks">
+              <label class="chk"><input type="checkbox" [checked]="optDraft().chart" (change)="setOpt({ chart: $any($event.target).checked })"> {{ t('chartPanelOption') }}</label>
+              <label class="chk"><input type="checkbox" [checked]="optDraft().driveInfo" (change)="setOpt({ driveInfo: $any($event.target).checked })"> {{ t('drivePanelOption') }}</label>
+              <label class="chk"><input type="checkbox" [checked]="optDraft().splash" (change)="setOpt({ splash: $any($event.target).checked })"> {{ t('splashOption') }}</label>
+              <label class="chk"><input type="checkbox" [checked]="optDraft().showDisk" (change)="setOpt({ showDisk: $any($event.target).checked })"> {{ t('diskColumnOption') }}</label>
+            </span>
+
+            <span class="fl">{{ t('backgroundLabel') }}</span>
+            <span class="opt-checks">
+              <label class="chk"><input type="checkbox" [checked]="optDraft().monitor" (change)="setOpt({ monitor: $any($event.target).checked })"> {{ t('monitorOption') }}</label>
+              <label class="chk"><input type="checkbox" [checked]="optDraft().tray" (change)="setOpt({ tray: $any($event.target).checked })"> {{ t('trayOption') }}</label>
+            </span>
+
+            <span class="opt-section">{{ t('excludeLabel') }}</span>
+            <span class="opt-wide">
+              <textarea class="exclude-box" rows="3" spellcheck="false"
+                        [value]="optDraft().exclude"
+                        (input)="setOpt({ exclude: $any($event.target).value })"
+                        [placeholder]="t('excludePlaceholder')"></textarea>
+              <span class="hint">{{ t('excludeHint') }}</span>
+            </span>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button (click)="restoreOptDefaults()">{{ t('restoreDefaults') }}</button>
+          <span class="spacer"></span>
+          <button (click)="closeOptions()">{{ t('cancel') }}</button>
+          <button class="primary" (click)="applyOptions()">{{ t('ok') }}</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ===================== help modal ===================== -->
+  @if (showHelp()) {
+    <div class="modal-overlay" (click)="showHelp.set(false)">
+      <div class="modal small" (click)="$event.stopPropagation()">
+        <div class="modal-head">{{ t('helpTitle') }}</div>
+        <div class="modal-body">
+          <p class="hint">{{ t('helpIntro') }}</p>
+          <table class="kv">
+            @for (s of shortcuts(); track s.keys) {
+              <tr><td class="k">{{ s.keys }}</td><td>{{ s.what }}</td></tr>
+            }
+          </table>
+          <p class="hint">{{ t('helpShell') }}</p>
+        </div>
+        <div class="modal-foot">
+          <span class="spacer"></span>
+          <button class="primary" (click)="showHelp.set(false)">{{ t('close') }}</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ===================== about modal ===================== -->
+  @if (showAbout()) {
+    <div class="modal-overlay" (click)="showAbout.set(false)">
+      <div class="modal small" (click)="$event.stopPropagation()">
+        <div class="modal-head">{{ t('aboutTitle') }}</div>
+        <div class="modal-body">
+          <div class="about-head">
+            <img class="about-logo" src="icon.png" alt="" />
+            <div class="about-title">{{ appName }} {{ appVersion }}</div>
+          </div>
+          <div class="hint">{{ t('aboutText') }}</div>
+          <table class="kv">
+            <tr><td class="k">Electron</td><td>{{ engineVersions.electron }}</td></tr>
+            <tr><td class="k">Chromium</td><td>{{ engineVersions.chrome }}</td></tr>
+            <tr><td class="k">Node</td><td>{{ engineVersions.node }}</td></tr>
+          </table>
+        </div>
+        <div class="modal-foot">
+          <span class="spacer"></span>
+          <button class="primary" (click)="showAbout.set(false)">{{ t('close') }}</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ===================== global search ===================== -->
+  @if (showFind()) {
+    <div class="modal-overlay" (click)="closeFind()">
+      <div class="modal find-modal" (click)="$event.stopPropagation()">
+        <div class="modal-head">
+          {{ t('findTitle') }}
+          <span class="mh-sub">{{ t('findSub') }}</span>
+        </div>
+        <div class="modal-body">
+          <div class="find-box">
+            <svg class="s-ico" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+              <circle cx="6.6" cy="6.6" r="4.4" fill="none" stroke="currentColor" stroke-width="1.7" />
+              <path d="M10 10l4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" fill="none" />
+            </svg>
+            <input #findInput [value]="findQuery()" (input)="setFindQuery($event)" (keydown)="findKey($event)"
+                   [placeholder]="t('findPlaceholder')" />
+          </div>
+          <div class="find-list">
+            @for (h of findHits(); track h.path; let i = $index) {
+              <button type="button" class="find-row" [class.on]="i === findSel()"
+                      (click)="goFind(h)" (mouseenter)="findSel.set(i)">
+                <span class="fr-ico">{{ h.kind === 'folder' ? '📁' : '📄' }}</span>
+                <span class="fr-text">
+                  <span class="fr-name">{{ h.name }}</span>
+                  <span class="fr-path">{{ h.parent }}</span>
+                </span>
+                <span class="fr-size">{{ scan.formatBytes(h.size) }}</span>
+              </button>
+            }
+            @if (findQuery().trim().length < 2) {
+              <div class="empty">{{ t('findHint') }}</div>
+            } @else if (!findHits().length) {
+              <div class="empty">{{ t('findEmpty') }}</div>
+            }
+          </div>
+        </div>
+        <div class="modal-foot">
+          <span class="hint">{{ findHits().length ? tf('findCount', { n: i18n.int(findHits().length) }) : '' }}</span>
+          <span class="spacer"></span>
+          <button (click)="closeFind()">{{ t('close') }}</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ===================== element picker (DevTools) ===================== -->
+  @if (inspectMode()) {
+    <div class="inspect-overlay" (mousedown)="onInspectPick($event)" (contextmenu)="$event.preventDefault()">
+      <div class="inspect-hint">{{ t('inspectHint') }}</div>
+    </div>
+  }
+</div>

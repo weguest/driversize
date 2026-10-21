@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Scan paralelo — sequência de mensagens",
+    "subtitle": "Do clique em Analisar ao scan:done, incluindo progresso incremental e cancelamento",
+    "output": "driversize-scan.sequence.html",
+    "viewBox": [920, 780],
+    "quality_profile": "standard",
+    "views": [
+      { "id": "start", "label": "Inicio do scan", "focus": ["ui", "preload", "main", "fs"], "note": "A UI pede o scan; o main enumera a raiz e ja devolve o primeiro lote." },
+      { "id": "pool", "label": "Pool de workers", "focus": ["main", "pool", "fs", "ui"], "note": "Subpastas viram lotes que voltam e alimentam a arvore em tempo real." },
+      { "id": "cancel", "label": "Cancelamento", "focus": ["ui", "main", "pool"], "note": "A flag compartilhada encerra os workers e fecha o scan como cancelado." }
+    ]
+  },
+  "participants": [
+    { "id": "user", "type": "external", "label": "Usuario", "sublabel": "clique em Analisar" },
+    { "id": "ui", "type": "frontend", "label": "Renderer", "sublabel": "Angular + ScanService" },
+    { "id": "preload", "type": "security", "label": "Preload", "sublabel": "contextBridge" },
+    { "id": "main", "type": "backend", "label": "Main", "sublabel": "orquestracao" },
+    { "id": "pool", "type": "backend", "label": "Workers", "sublabel": "worker_threads" },
+    { "id": "fs", "type": "database", "label": "Disco", "sublabel": "readdir + lstat" }
+  ],
+  "segments": [
+    { "from": 160, "to": 300, "label": "01 / ENTREGA" },
+    { "from": 320, "to": 580, "label": "02 / POOL DE WORKERS" },
+    { "from": 590, "to": 672, "label": "03 / CANCELAMENTO" }
+  ],
+  "messages": [
+    { "id": "m-ask", "from": "ui", "to": "preload", "y": 185, "label": "startScan(root)", "variant": "emphasis" },
+    { "id": "m-invoke", "from": "preload", "to": "main", "y": 218, "label": "scan:start", "variant": "emphasis" },
+    { "id": "m-readroot", "from": "main", "to": "fs", "y": 250, "label": "readdir + lstat", "variant": "default" },
+    { "id": "m-rootbatch", "from": "main", "to": "ui", "y": 282, "label": "scan:batch (raiz)", "variant": "return" },
+    { "id": "m-spawn", "from": "main", "to": "pool", "y": 345, "label": "worker x N", "variant": "emphasis" },
+    { "id": "m-walk", "from": "pool", "to": "fs", "y": 378, "label": "walk()", "variant": "default" },
+    { "id": "m-entries", "from": "fs", "to": "pool", "y": 411, "label": "entradas", "variant": "return" },
+    { "id": "m-batch", "from": "pool", "to": "main", "y": 444, "label": "batch (500)", "variant": "return" },
+    { "id": "m-stream", "from": "main", "to": "ui", "y": 477, "label": "scan:batch", "variant": "emphasis" },
+    { "id": "m-progress", "from": "pool", "to": "main", "y": 510, "label": "progress (200 ms)", "variant": "dashed" },
+    { "id": "m-ready", "from": "pool", "to": "main", "y": 540, "label": "ready + exit", "variant": "return" },
+    { "id": "m-done", "from": "main", "to": "ui", "y": 572, "label": "scan:done", "variant": "emphasis" },
+    { "id": "m-cancel", "from": "ui", "to": "main", "y": 600, "label": "scan:cancel", "variant": "security" },
+    { "id": "m-abort", "from": "main", "to": "pool", "y": 630, "label": "terminate()", "variant": "security" },
+    { "id": "m-cancelled", "from": "main", "to": "ui", "y": 658, "label": "done {cancelled}", "variant": "return" },
+    { "id": "m-render", "from": "ui", "to": "user", "y": 690, "label": "renderiza", "variant": "return" }
+  ],
+  "activations": [
+    { "participant": "ui", "from": 175, "to": 700, "type": "frontend" },
+    { "participant": "main", "from": 210, "to": 665, "type": "backend" },
+    { "participant": "pool", "from": 340, "to": 585, "type": "backend" },
+    { "participant": "fs", "from": 245, "to": 420, "type": "database" }
+  ],
+  "cards": [
+    { "dot": "emerald", "title": "Scan colaborativo", "items": ["Main enumera a raiz e distribui as subpastas", "Cada worker devolve lotes de ate 500 itens", "O renderer agrega bottom-up a cada lote"] },
+    { "dot": "amber", "title": "UI que respira", "items": ["scan:batch e progress chegam por eventos IPC", "Callback fora do Angular exige NgZone.run", "A arvore cresce enquanto o disco e lido"] },
+    { "dot": "rose", "title": "Cancelamento", "items": ["scan:cancel grava Atomics e encerra os workers", "scan:done devolve cancelled:true", "Nao ha retomada: um novo scan comeca do zero"] }
+  ]
+}

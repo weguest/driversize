@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "Ciclo de vida do scan",
+    "subtitle": "Estados do scan, o caminho de cancelamento e as saidas terminais",
+    "output": "driversize-scan.lifecycle.html",
+    "viewBox": [980, 680],
+    "quality_profile": "standard",
+    "views": [
+      { "id": "main", "label": "Caminho principal", "focus": ["idle", "scanning", "aggregating", "complete"], "note": "Do ocioso ao pronto, com a agregacao como fase propria." },
+      { "id": "cancel", "label": "Cancelar", "focus": ["scanning", "cancelling", "cancelled"], "note": "Cancelar pausa a coleta e termina os workers." },
+      { "id": "exits", "label": "Saidas", "focus": ["scanning", "error", "cancelled"], "note": "Erro de acesso na raiz aborta o scan; pastas sem permissao sao puladas." }
+    ]
+  },
+  "lanes": [
+    { "id": "main", "label": "Ciclo do scan" },
+    { "id": "waiting", "label": "Cancelamento" },
+    { "id": "terminal", "label": "Saidas" }
+  ],
+  "states": [
+    { "id": "idle", "type": "start", "label": "Ocioso", "sublabel": "app aberto", "lane": "main", "col": 0, "step": "01", "tag": "ocioso" },
+    { "id": "scanning", "type": "active", "label": "Escaneando", "sublabel": "workers ativos", "lane": "main", "col": 1, "step": "02", "tag": "trabalho" },
+    { "id": "aggregating", "type": "active", "label": "Agregando", "sublabel": "lotes chegando", "lane": "main", "col": 2, "step": "03", "tag": "bottom-up" },
+    { "id": "complete", "type": "success", "label": "Pronto", "sublabel": "arvore completa", "lane": "main", "col": 3, "step": "04", "tag": "done" },
+    { "id": "cancelling", "type": "waiting", "label": "Cancelando", "sublabel": "flag + terminate", "lane": "waiting", "col": 2, "tag": "pausa" },
+    { "id": "cancelled", "type": "failure", "label": "Cancelado", "sublabel": "cancelled:true", "lane": "terminal", "col": 2, "tag": "terminal" },
+    { "id": "error", "type": "failure", "label": "Erro", "sublabel": "acesso negado", "lane": "terminal", "col": 1, "tag": "terminal" }
+  ],
+  "transitions": [
+    { "id": "t-start", "from": "idle", "to": "scanning", "label": "startScan(root)", "variant": "emphasis", "labelDy": 55 },
+    { "id": "t-batches", "from": "scanning", "to": "aggregating", "label": "primeiros lotes", "variant": "emphasis", "labelDy": 55 },
+    { "id": "t-done", "from": "aggregating", "to": "complete", "label": "scan:done", "variant": "emphasis", "labelDy": 55 },
+    { "id": "t-cancel-req", "from": "scanning", "to": "cancelling", "label": "scan:cancel", "variant": "security", "route": "drop", "fromSide": "bottom", "toSide": "top" },
+    { "id": "t-cancelled", "from": "cancelling", "to": "cancelled", "variant": "security", "fromSide": "bottom", "toSide": "top" },
+    { "id": "t-error", "from": "scanning", "to": "error", "label": "scan:error", "variant": "security", "fromSide": "bottom", "toSide": "top" }
+  ],
+  "cards": [
+    { "dot": "emerald", "title": "Caminho principal", "items": ["Ocioso, Escaneando, Agregando, Pronto", "A conclusao e uma fase, nao um estado solto", "Filtrar depois nao reinicia o scan"] },
+    { "dot": "amber", "title": "Pausas que nao terminam", "items": ["Cancelar grava Atomics e encerra os workers", "scan:done devolve cancelled:true", "Nao existe retomada: um novo scan comeca do zero"] },
+    { "dot": "rose", "title": "Saidas", "items": ["Erro de leitura na raiz aborta com scan:error", "Pastas sem permissao sao puladas na varredura", "Estados terminais nao voltam sozinhos"] }
+  ]
+}

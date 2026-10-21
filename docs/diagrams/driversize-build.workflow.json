@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Build e execucao",
+    "subtitle": "Angular, processo principal e add-on nativo ate a janela do Electron",
+    "output": "driversize-build.workflow.html",
+    "quality_profile": "standard",
+    "views": [
+      { "id": "build", "label": "Compilar", "focus": ["edit", "ng", "tsc"], "note": "O renderer e o main process compilam em passos separados." },
+      { "id": "native", "label": "Add-on nativo", "focus": ["tsc", "gyp", "start"], "note": "O node-gyp so entra quando o add-on muda." },
+      { "id": "launch", "label": "Executar", "focus": ["tsc", "gyp", "start"], "note": "O Electron carrega main.js, o renderer e, se existir, shellmenu.node." }
+    ]
+  },
+  "lanes": [
+    { "id": "dev", "label": "Edicao" },
+    { "id": "build", "label": "Build" },
+    { "id": "run", "label": "Execucao" }
+  ],
+  "phases": [
+    { "id": "compile", "label": "Compilar + empacotar", "fromCol": 0, "toCol": 3, "variant": "emphasis" },
+    { "id": "launch", "label": "Carregar", "fromCol": 4, "toCol": 5, "variant": "dashed" }
+  ],
+  "mainPath": ["edit", "ng", "tsc", "start"],
+  "nodes": [
+    { "id": "edit", "lane": "dev", "col": 0, "type": "frontend", "label": "Editar fontes", "sublabel": "src + electron" },
+    { "id": "ng", "lane": "build", "col": 1, "type": "backend", "label": "ng build", "sublabel": "Angular 20", "tag": "~3s" },
+    { "id": "tsc", "lane": "build", "col": 3, "type": "backend", "label": "tsc", "sublabel": "electron → dist-electron" },
+    { "id": "gyp", "lane": "build", "col": 5, "type": "cloud", "label": "node-gyp", "sublabel": "shellmenu.node", "tag": "opcional" },
+    { "id": "start", "lane": "run", "col": 5, "type": "backend", "label": "electron .", "sublabel": "main + renderer" }
+  ],
+  "edges": [
+    { "id": "e-save", "from": "edit", "to": "ng", "label": "salvar", "variant": "emphasis", "role": "main", "route": "drop", "fromSide": "bottom", "toSide": "top" },
+    { "id": "e-web", "from": "ng", "to": "tsc", "variant": "emphasis", "role": "main", "route": "straight" },
+    { "id": "e-native", "from": "tsc", "to": "gyp", "label": "se native/ mudou", "variant": "dashed", "role": "branch", "route": "straight" },
+    { "id": "e-main", "from": "tsc", "to": "start", "label": "dist-electron", "variant": "emphasis", "role": "main", "route": "drop", "fromSide": "bottom", "toSide": "top" },
+    { "id": "e-addon", "from": "gyp", "to": "start", "label": "shellmenu.node", "variant": "dashed", "role": "branch", "route": "drop", "fromSide": "bottom", "toSide": "top", "labelDy": 8, "labelDx": 70 }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Scripts", "items": ["npm run build: ng build (Angular 20)", "npm run build:electron: tsc do main e dos workers", "npm run build:native: node-gyp rebuild"] },
+    { "dot": "amber", "title": "Add-on nativo", "items": ["VS Build Tools 2022 + Python 3.10", "Node-API: dispensa electron-rebuild", "Sem o addon, o app usa o menu proprio"] },
+    { "dot": "emerald", "title": "Modo dev", "items": ["npm run dev sobe ng serve + electron com FS_DEV_URL", "HMR no renderer; o main exige reinicio", "FS_AUTOSCAN e FS_FILTER automatizam testes"] }
+  ]
+}
