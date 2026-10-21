@@ -404,6 +404,19 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  /**
+   * Apply-with-no-scan affordance: the filtered list is empty because the folder
+   * on screen was only opened, never analysed. Scan it now.
+   */
+  scanSelected(): void {
+    const p = this.scan.selectedPath();
+    if (!p) return;
+    this.overview.set(false);
+    this.pathInput.set(p);
+    this.pathEditing.set(false);
+    void this.scan.startScan(p);
+  }
+
   async pick(): Promise<void> {
     const p = await this.scan.pickFolder();
     if (p) {

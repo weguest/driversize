@@ -358,6 +358,9 @@
           <span class="c-date sortable" (click)="setSort('modified')">{{ t('colModified') }} {{ arrow('modified') }}</span>
         </div>
         <div class="table-body">
+          @if (scan.filterRowsTruncated()) {
+            <div class="filter-note">{{ tf('filterTruncated', { total: i18n.int(scan.filterRowsTotal()), n: i18n.int(scan.filterRowsShown()) }) }}</div>
+          }
           @for (r of scan.rows(); track r.path) {
             <div class="tr" [class.folder]="r.kind === 'folder'" [class.selrow]="isSelected(r.path)"
                  [class.nodisk]="!scan.showDisk()"
@@ -384,12 +387,21 @@
             </div>
           }
           @if (!scan.rows().length) {
-            <div class="empty">{{ scan.search() ? t('noResults') : t('detailsEmpty') }}</div>
+            @if (scan.filterNeedsScan()) {
+              <div class="empty">{{ t('filterNeedsScan') }}
+                <button class="link" (click)="scanSelected()">{{ t('filterNeedsScanAction') }}</button>
+              </div>
+            } @else {
+              <div class="empty">{{ scan.search() ? t('noResults') : scan.filter().enabled ? t('filterEmpty') : t('detailsEmpty') }}</div>
+            }
           }
         </div>
       } @else if (contentTab() === 'items') {
         <!-- /grade -->
         <div class="grid">
+          @if (scan.filterRowsTruncated()) {
+            <div class="filter-note">{{ tf('filterTruncated', { total: i18n.int(scan.filterRowsTotal()), n: i18n.int(scan.filterRowsShown()) }) }}</div>
+          }
           @for (r of scan.rows(); track r.path) {
             <div class="tile" [class.selrow]="isSelected(r.path)" [title]="r.path"
                  (click)="onRowClick($event, r, $index)"
@@ -402,7 +414,13 @@
             </div>
           }
           @if (!scan.rows().length) {
-            <div class="empty">{{ scan.search() ? t('noResults') : t('detailsEmpty') }}</div>
+            @if (scan.filterNeedsScan()) {
+              <div class="empty">{{ t('filterNeedsScan') }}
+                <button class="link" (click)="scanSelected()">{{ t('filterNeedsScanAction') }}</button>
+              </div>
+            } @else {
+              <div class="empty">{{ scan.search() ? t('noResults') : scan.filter().enabled ? t('filterEmpty') : t('detailsEmpty') }}</div>
+            }
           }
         </div>
       } @else {

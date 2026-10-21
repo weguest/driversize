@@ -60,6 +60,12 @@ const CAT_HINT: Record<CategoryId, I18nKey> = {
 const LARGEST_LIMIT = 300;
 /** How many rows the "largest files of the drive" dialog keeps. */
 const GLOBAL_LARGEST_LIMIT = 500;
+/**
+ * Cap for the filtered result list. A filter is a query over the whole scanned
+ * subtree, so a broad one ("size < 1 GB", every name) can match millions of
+ * entries; the list is not virtualised, so only the first matches are rendered.
+ */
+const FILTER_ROWS_LIMIT = 5000;
 
 /** Case-insensitive wildcard match supporting `*` and `?`. */
 function wildcardMatch(name: string, mask: string): boolean {
@@ -1337,6 +1343,65 @@ export class ScanService {
     return { path: f.path, name: f.name, kind: 'file', size: f.size, allocated: f.allocated, files: 0, folders: 0, mtime: f.mtime, sub };
   }
 
+  /**
+   * Rows produced by the active filter. The whole selected subtree is walked, so a
+   * match buried in a subfolder shows up too; each row carries the folder it lives
+   * in (the `sub` part after the name). `total` is the real number of matches, so
+   * the UI can say when the list had to be capped.
+   */
+  private readonly filterResult = computed<{ rows: Row[]; total: number }>(() => {
+    this.revision();
+    const spec = this.filter();
+    const n = this.selectedNode();
+    if (!n || !spec.enabled) return { rows: [], total: 0 };
+    const out: Row[] = [];
+    let total = 0;
+    const walk = (node: FolderNode, rel: string): void => {
+      for (const c of node.children) {
+        if (this.passes(this.dirEntry(c), spec)) {
+          total++;
+          if (out.length < FILTER_ROWS_LIMIT) out.push(this.folderRow(c, rel || undefined));
+        }
+        walk(c, rel ? rel + '\\' + c.name : c.name);
+      }
+      for (const f of node.childFiles) {
+        if (!this.passes(f, spec)) continue;
+        total++;
+        if (out.length < FILTER_ROWS_LIMIT) out.push(this.fileRow(f, rel || undefined));
+      }
+    };
+    walk(n, '');
+    return { rows: this.applySort(out), total };
+  });
+
+  /** Number of entries matched by the active filter (may exceed the shown rows). */
+  readonly filterRowsTotal = computed<number>(() => this.filterResult().total);
+  /** How many of those entries the list is actually rendering. */
+  readonly filterRowsShown = computed<number>(() => this.filterResult().rows.length);
+  /** True when the active filter matched more entries than the list can render. */
+  readonly filterRowsTruncated = computed<boolean>(() => {
+    const r = this.filterResult();
+    return r.total > r.rows.length;
+  });
+
+  /**
+   * True when a filter is active over a folder that was never scanned: a single
+   * level listing has no folder sizes and no subfolder contents, so the filter can
+   * match nothing. The UI then offers to scan the folder instead of pretending the
+   * folder is empty.
+   */
+  readonly filterNeedsScan = computed<boolean>(() => {
+    this.revision();
+    if (!this.filter().enabled || this.scanning()) return false;
+    const p = this.selectedPath();
+    if (!p) return false;
+    const root = this.rootPath();
+    if (!root) return true;
+    const sel = p.toLowerCase();
+    const base = root.toLowerCase().replace(/\\+$/, '');
+    return !(sel === base || sel.startsWith(base + '\\'));
+  });
+
   /** Direct contents of the selected folder (optionally pruned by the modal filter). */
   private readonly listingRows = computed<Row[]>(() => {
     // Read revision directly: selectedNode() returns the same (mutated) object, so
@@ -1346,16 +1411,8 @@ export class ScanService {
     if (!n) return this.externalRows();
     const spec = this.filter();
 
-    // With a filter active, show a RESULT LIST over the selected subtree,
-    // honouring the "Incluir Arquivos/Pastas" gates.
-    if (spec.enabled) {
-      // Only items RELATIVE to the selected folder (its direct contents), no subtree
-      // flattening -> no nested duplicates. Container folders are not "results".
-      const out: Row[] = [];
-      for (const c of n.children) if (this.passes(this.dirEntry(c), spec)) out.push(this.folderRow(c));
-      for (const f of n.childFiles) if (this.passes(f, spec)) out.push(this.fileRow(f));
-      return this.applySort(out);
-    }
+    // With a filter active the list is a RESULT LIST over the whole selected subtree.
+    if (spec.enabled) return this.filterResult().rows;
 
     return this.applySort([
       ...n.children.map((c) => this.folderRow(c)),

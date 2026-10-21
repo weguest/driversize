@@ -548,7 +548,16 @@
 .c-chk input { margin: 0; }
 .c-ico { font-size: 15px; text-align: center; }
 .c-name { display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; }
-.c-name .sub { color: var(--mute); font-size: 11px; }
+.c-name .sub { color: var(--mute); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+/* "the filter matched more than the list renders" banner */
+.filter-note {
+  grid-column: 1 / -1;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line-2);
+  background: var(--amber-soft);
+  color: var(--dim);
+  font-size: 11.5px;
+}
 .c-size { display: flex; flex-direction: column; gap: 3px; }
 .sz-val { font-variant-numeric: tabular-nums; }
 .sz-bar { display: block; height: 4px; border-radius: 2px; background: var(--bar); overflow: hidden; }
@@ -699,7 +708,10 @@
 .modal-head .mh-sub { color: var(--mute); font-size: 12px; font-weight: 400; }
 .modal-body { padding: 14px 18px; overflow: auto; display: flex; flex-direction: column; gap: 10px; }
 .modal-foot { display: flex; align-items: center; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--line); }
-.modal-foot button, .modal-body .unit {
+/* dialog buttons: footer actions plus any plain button used inside a body */
+.modal-foot button,
+.modal-body button:not(.ibtn):not(.link),
+.modal-body .unit {
   padding: 6px 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -710,8 +722,12 @@
 }
 .modal-body .unit { min-width: 46px; padding: 5px 10px; }
 .modal-body .unit.active { background: var(--blue); border-color: var(--blue-dark); color: #fff; }
-.modal-foot button.primary { background: var(--blue); border-color: var(--blue-dark); color: #fff; }
-.modal-foot button.primary:hover { background: var(--blue-dark); }
+.modal-foot button:hover:not(:disabled),
+.modal-body button:not(.ibtn):not(.link):hover:not(:disabled) { background: var(--hover); border-color: var(--border-strong); }
+.modal-foot button.primary,
+.modal-body button.primary { background: var(--blue); border-color: var(--blue-dark); color: #fff; }
+.modal-foot button.primary:hover,
+.modal-body button.primary:hover { background: var(--blue-dark); border-color: var(--blue-dark); }
 .modal-foot .spacer { flex: 1; }
 .modal-foot .fhint { color: var(--mute); }
 
@@ -771,6 +787,7 @@
 .about-title { font-size: 17px; font-weight: 600; }
 
 .empty { padding: 20px; color: var(--mute); text-align: center; }
+.empty .link { margin-left: 6px; }
 
 /* =========================== duplicate finder =========================== */
 .dupes-bar { align-items: center; }
@@ -803,9 +820,12 @@
 .dr-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dr-dir { color: var(--mute); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dr-keep { color: var(--mute); font-size: 11px; }
-.modal-foot button.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
-.modal-foot button.danger:hover:not(:disabled) { background: var(--red-dark); }
-.modal-foot button.danger:disabled { opacity: 0.45; cursor: default; }
+.modal-foot button.danger,
+.modal-body button.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+.modal-foot button.danger:hover:not(:disabled),
+.modal-body button.danger:hover:not(:disabled) { background: var(--red-dark); border-color: var(--red-dark); }
+.modal-foot button.danger:disabled,
+.modal-body button.danger:disabled { opacity: 0.45; cursor: default; }
 
 /* =========================== safe cleanup =========================== */
 .clean-list { display: flex; flex-direction: column; max-height: 56vh; overflow: auto; }
