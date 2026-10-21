@@ -1,7 +1,7 @@
 {
   "name": "driversize",
   "productName": "DriverSize",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "DriverSize - disk usage analyzer (Electron + Angular)",
   "author": "DriverSize",
   "main": "dist-electron/main.js",

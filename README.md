@@ -113,6 +113,17 @@ idioma/pasta inicial vêm das mesmas configurações de `%APPDATA%\DriverSize`.
 
 ## Versões
 
+### 1.2.2
+
+- **Filtro na subárvore**: o filtro da pasta agora percorre **todas as subpastas** da pasta selecionada,
+  e não apenas o nível direto. Cada linha mostra a pasta relativa (ex.: `rancher-desktop\distro-data`) e
+  filtros amplos são limitados a 5.000 linhas, com aviso de truncamento.
+- **Aviso de pasta não analisada**: ao aplicar um filtro numa pasta que só foi aberta (sem varredura), a
+  lista vazia explica o motivo e oferece o botão **Escanear esta pasta** — antes o filtro simplesmente
+  não encontrava nada.
+- **Botões nos diálogos**: os botões dentro do corpo dos diálogos (ex.: **Procurar duplicados**) passaram a
+  usar a formatação do rodapé, em vez de aparecerem sem estilo.
+
 ### 1.2.1
 
 - **Pastas primeiro ao ordenar por tamanho**: nas colunas **Tamanho**, **No disco** e **%**, as pastas
