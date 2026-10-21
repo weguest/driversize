@@ -79,10 +79,11 @@ Analisador de uso de disco (Electron + Angular 20 + TypeScript).
 ## Como rodar
 
 ```powershell
-npm install          # se necessário
-npm run build        # compila o Angular -> dist/driversize/browser
+npm install              # se necessário
+npm run install:electron # baixa o binário do Electron para node_modules/electron/dist
+npm run build            # compila o Angular -> dist/driversize/browser
 npm run build:electron   # compila o main/preload/worker -> dist-electron
-npm run electron     # abre o app
+npm run electron         # abre o app
 ```
 
 Ou tudo de uma vez:
@@ -106,9 +107,9 @@ npm run dist:portable   # só o portátil
 ```
 
 Os artefatos saem em `release/` (`DriverSize-<versão>-setup.exe`, `DriverSize-<versão>-portable.exe`).
-O Electron usado é o de `node_modules/electron/dist` (sem download), o addon nativo
-(`native/shellmenu/build/Release/shellmenu.node`) é mantido fora do `.asar` e o idioma/pasta inicial
-vêm das mesmas configurações de `%APPDATA%\DriverSize`.
+O Electron usado é o de `node_modules/electron/dist` (baixado por `npm run install:electron`), o
+addon nativo (`native/shellmenu/build/Release/shellmenu.node`) é mantido fora do `.asar` e o
+idioma/pasta inicial vêm das mesmas configurações de `%APPDATA%\DriverSize`.
 
 ## Versões
 

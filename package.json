@@ -11,12 +11,13 @@
     "build:electron": "tsc -p electron/tsconfig.json",
     "build:native": "cd native/shellmenu && node-gyp rebuild",
     "electron": "electron .",
+    "install:electron": "install-electron",
     "start": "npm run build && npm run build:electron && electron .",
     "dev": "npm run build:electron && concurrently -k \"ng serve --port 4200\" \"wait-on tcp:4200 && cross-env FS_DEV_URL=http://localhost:4200 electron .\"",
     "test": "ng test",
-    "pack": "npm run build && npm run build:electron && electron-builder --win --dir",
-    "dist": "npm run build && npm run build:electron && electron-builder --win",
-    "dist:portable": "npm run build && npm run build:electron && electron-builder --win portable"
+    "pack": "npm run build && npm run build:electron && electron-builder --win --dir --publish never",
+    "dist": "npm run build && npm run build:electron && electron-builder --win --publish never",
+    "dist:portable": "npm run build && npm run build:electron && electron-builder --win portable --publish never"
   },
   "build": {
     "appId": "com.driversize.app",
